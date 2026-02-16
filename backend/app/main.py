@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.routes import cognitive,report,speech,full_assessment,history,auth
+from app.routes import cognitive,report,speech,full_assessment,history,auth,memory
 from app.db import engine, Base
 from app.models.assessment import Assessment
 
@@ -13,7 +13,10 @@ app.include_router(report.router)
 app.include_router(full_assessment.router)
 app.include_router(history.router)
 app.include_router(auth.router)
+app.include_router(memory.router)
+
 
 @app.get("/")
 def home():
     return {"message": "AI Dementia Detection Running"}
+
