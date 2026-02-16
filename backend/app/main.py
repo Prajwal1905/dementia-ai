@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.routes import cognitive,report,speech,full_assessment,history
+from app.routes import cognitive,report,speech,full_assessment,history,auth
 from app.db import engine, Base
 from app.models.assessment import Assessment
 
@@ -12,6 +12,7 @@ app.include_router(speech.router)
 app.include_router(report.router)
 app.include_router(full_assessment.router)
 app.include_router(history.router)
+app.include_router(auth.router)
 
 @app.get("/")
 def home():

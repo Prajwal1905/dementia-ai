@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, DateTime
+from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKey
 from datetime import datetime
 from app.db import Base
 
@@ -6,6 +6,7 @@ class Assessment(Base):
     __tablename__ = "assessments"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
 
     memory_score = Column(Float)
     time_taken = Column(Float)          # NEW

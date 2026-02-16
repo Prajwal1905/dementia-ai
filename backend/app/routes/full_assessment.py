@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form
+from fastapi import APIRouter, UploadFile, File, Form, Depends
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
@@ -11,6 +11,7 @@ from app.services.pdf_report import create_report
 from app.services.ml_predictor import predict_risk
 from app.services.explainer import generate_explanation
 from app.services.retrainer import retrain_if_needed
+from app.services.dependencies import get_current_user
 
 from app.db import SessionLocal
 from app.models.assessment import Assessment
@@ -33,7 +34,8 @@ async def full_assessment(
     file: UploadFile = File(...),
     shown_words: str = Form(...),
     recalled_words: str = Form(...),
-    time_taken: float = Form(...)
+    time_taken: float = Form(...),
+    user_id: int = Depends(get_current_user)
 ):
 
     # ---------- MEMORY SCORE ----------
@@ -104,6 +106,7 @@ async def full_assessment(
 
     # ---------- SAVE RECORD ----------
     record = Assessment(
+        user_id=user_id,
         memory_score=memory_score,
         time_taken=time_taken,
         avg_sentence_length=features["avg_sentence_length"],
