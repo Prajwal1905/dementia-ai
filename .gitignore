@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+
+# ML models
+*.pt
+*.pth
+*.pkl
+*.h5
+
+# Upload data
+storage/
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Flutter
+mobile_app/.dart_tool/
+mobile_app/build/
+mobile_app/.idea/
+mobile_app/android/.gradle/
+mobile_app/ios/Pods/
+mobile_app/pubspec.lock
+
+# VSCode
+.vscode/
+
+# Logs
+*.log
