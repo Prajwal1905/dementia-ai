@@ -16,13 +16,16 @@ class RegisterInput(BaseModel):
 def register(data: RegisterInput):
     db = SessionLocal()
 
-    if db.query(User).filter(User.email == data.email).first():
+    email = data.email.strip().lower()
+    password = data.password.strip()
+
+    if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
     user = User(
-        name=data.name,
-        email=data.email,
-        password_hash=hash_password(data.password)
+        name=data.name.strip(),
+        email=email,
+        password_hash=hash_password(password)
     )
 
     db.add(user)
@@ -31,20 +34,22 @@ def register(data: RegisterInput):
 
     return {"message": "User created"}
 
-
 class LoginInput(BaseModel):
     email: str
     password: str
 
 @router.post("/login")
 def login(data: LoginInput):
+
+    email = data.email.strip().lower()
+    password = data.password.strip()
+
     db = SessionLocal()
-    user = db.query(User).filter(User.email == data.email).first()
+    user = db.query(User).filter(User.email == email).first()
     db.close()
 
-    if not user or not verify_password(data.password, user.password_hash):
+    if not user or not verify_password(password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_token(user.id)
-
     return {"token": token, "user_id": user.id}

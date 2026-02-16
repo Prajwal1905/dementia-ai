@@ -5,8 +5,10 @@
 import FlutterMacOS
 import Foundation
 
-import record_darwin
+import flutter_sound
+import path_provider_foundation
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
-  RecordPlugin.register(with: registry.registrar(forPlugin: "RecordPlugin"))
+  FlutterSoundPlugin.register(with: registry.registrar(forPlugin: "FlutterSoundPlugin"))
+  PathProviderPlugin.register(with: registry.registrar(forPlugin: "PathProviderPlugin"))
 }
