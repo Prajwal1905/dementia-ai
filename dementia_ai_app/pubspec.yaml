@@ -17,6 +17,8 @@ dependencies:
   fl_chart: ^0.68.0
   flutter_sound: ^9.2.13
   path_provider: ^2.1.2
+  shared_preferences: ^2.2.2
+
 
 
 dev_dependencies:

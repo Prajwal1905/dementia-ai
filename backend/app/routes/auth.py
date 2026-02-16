@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from app.db import SessionLocal
 from app.models.user import User
@@ -39,10 +39,16 @@ class LoginInput(BaseModel):
     password: str
 
 @router.post("/login")
-def login(data: LoginInput):
+async def login(data: LoginInput, request: Request):
 
-    email = data.email.strip().lower()
-    password = data.password.strip()
+    raw = await request.body()
+    print("RAW BODY FROM PHONE:", raw)
+
+    email = data.email
+    password = data.password
+
+    print("PARSED EMAIL:", repr(email))
+    print("PARSED PASSWORD:", repr(password))
 
     db = SessionLocal()
     user = db.query(User).filter(User.email == email).first()
