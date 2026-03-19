@@ -4,28 +4,39 @@ import 'api.dart';
 import 'session.dart';
 
 class AssessmentService {
-  static Future<String?> submitMemory(
-      String shownWords, String recalledWords, double timeTaken) async {
+  static Future<Map<String, dynamic>?> submitFullAssessment(
+    String shownWords,
+    String recalledWords,
+    double timeTaken,
+    String audioPath,
+  ) async {
     final token = await Session.getToken();
 
-    final res = await http.post(
-      Uri.parse("${Api.baseUrl}/memory-test"),
-      headers: {
-        "Content-Type": "application/json; charset=UTF-8",
-        "Authorization": "Bearer $token"
-      },
-      body: jsonEncode({
-        "shown_words": shownWords.split(","),
-        "recalled_words": recalledWords.split(RegExp(r"[ ,]+")),
-        "time_taken": timeTaken
-      }),
+    var request = http.MultipartRequest(
+      "POST",
+      Uri.parse("${Api.baseUrl}/full-assessment"),
     );
 
-    print(res.statusCode);
-    print(res.body);
+    request.headers["Authorization"] = "Bearer $token";
 
-    if (res.statusCode == 200) {
-      return res.body;
+    // text fields
+    request.fields["shown_words"] = shownWords;
+    request.fields["recalled_words"] = recalledWords;
+    request.fields["time_taken"] = timeTaken.toString();
+
+    // audio file
+    request.files.add(
+      await http.MultipartFile.fromPath("file", audioPath),
+    );
+
+    var response = await request.send();
+    var resBody = await response.stream.bytesToString();
+
+    print(response.statusCode);
+    print(resBody);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(resBody);
     }
 
     return null;

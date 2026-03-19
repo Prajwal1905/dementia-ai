@@ -1,8 +1,10 @@
 import 'dart:convert';
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import '../services/api.dart';
+import '../services/assessment_service.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_sound/flutter_sound.dart';
+import 'package:path_provider/path_provider.dart';
 
 class MemoryTestScreen extends StatefulWidget {
   const MemoryTestScreen({super.key});
@@ -12,102 +14,214 @@ class MemoryTestScreen extends StatefulWidget {
 }
 
 class _MemoryTestScreenState extends State<MemoryTestScreen> {
+  List<String> shownWords = [];
+  final recalledController = TextEditingController();
 
-  List<String> words = [];
-  bool showingWords = true;
-  String result = "";
-  final recallController = TextEditingController();
-  late DateTime startTime;
+  bool wordsVisible = true;
+  DateTime? startTime;
 
+  String resultText = "";
+  Map<String, dynamic>? finalResult;
+  FlutterSoundRecorder? recorder;
+  bool isRecording = false;
+  String? audioPath;
   @override
   void initState() {
     super.initState();
+    recorder = FlutterSoundRecorder();
+    initRecorder();
     fetchWords();
   }
 
-  // STEP 1 — Get random words
-  Future<void> fetchWords() async {
-    final res = await http.get(Uri.parse("${Api.baseUrl}/memory-words"));
-    final data = jsonDecode(res.body);
+  Future<void> initRecorder() async {
+    await recorder!.openRecorder();
+  }
 
+  Future<void> startRecording() async {
+    final dir = await getTemporaryDirectory();
+    audioPath = "${dir.path}/audio.aac";
+
+    await recorder!.startRecorder(toFile: audioPath);
+
+    setState(() => isRecording = true);
+  }
+
+  Future<void> stopRecording() async {
+    await recorder!.stopRecorder();
+    setState(() => isRecording = false);
+  }
+
+  // ---------- FETCH WORDS ----------
+  Future<void> fetchWords() async {
+    final res = await http.get(
+      Uri.parse("${Api.baseUrl}/memory/words"),
+    );
+
+    final data = jsonDecode(res.body);
     setState(() {
-      words = List<String>.from(data["words"]);
-      showingWords = true;
+      shownWords = List<String>.from(data["words"]);
+      wordsVisible = true;
+      resultText = "";
+      finalResult = null;
     });
 
     startTime = DateTime.now();
 
-    // hide words after 5 seconds
     Future.delayed(const Duration(seconds: 5), () {
-      setState(() {
-        showingWords = false;
-      });
+      setState(() => wordsVisible = false);
     });
   }
 
-  // STEP 2 — Submit recall
+  // ---------- SUBMIT FULL ASSESSMENT ----------
   Future<void> submitTest() async {
+    if (audioPath == null) {
+      setState(() {
+        resultText = "Please record audio first 🎤";
+      });
+      return;
+    }
 
-    final recalled = recallController.text.split(" ");
+    final endTime = DateTime.now();
+    final timeTaken = endTime.difference(startTime!).inSeconds;
 
-    final seconds = DateTime.now().difference(startTime).inSeconds;
-
-    final res = await http.post(
-      Uri.parse("${Api.baseUrl}/memory-test"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "shown_words": words,
-        "recalled_words": recalled,
-        "time_taken": seconds
-      }),
+    final response = await AssessmentService.submitFullAssessment(
+      shownWords.join(","),
+      recalledController.text,
+      timeTaken.toDouble(),
+      audioPath!, // ✅ REAL AUDIO
     );
 
-    final data = jsonDecode(res.body);
+    if (response != null) {
+      final result = response["result"];
 
-    setState(() {
-      result = "Score: ${data["memory_score"]} / 100";
-    });
+      setState(() {
+        finalResult = result;
+
+        resultText = """
+Memory Score: ${result["memory_score"]}
+
+Risk: ${result["risk"]}
+
+Confidence: ${result["confidence"]}%
+
+AI Insight:
+${result["explanation"]}
+""";
+      });
+    } else {
+      setState(() {
+        resultText = "Assessment failed ❌";
+      });
+    }
   }
 
+  // ---------- RISK COLOR ----------
+  Color getRiskColor(String risk) {
+    if (risk.contains("High")) return Colors.red;
+    if (risk.contains("Mild")) return Colors.orange;
+    return Colors.green;
+  }
+
+  // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Memory Test")),
+      appBar: AppBar(title: const Text("Cognitive Test")),
       body: Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                "Memorize these words",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 20),
+              ),
 
-            if (showingWords)
-              Column(
-                children: [
-                  const Text("Memorize these words:", style: TextStyle(fontSize: 20)),
-                  const SizedBox(height: 20),
-                  Text(words.join("   "),
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 20),
-                  const Text("They will disappear in 5 seconds...")
-                ],
-              )
-            else
-              Column(
-                children: [
-                  const Text("Type the words you remember:",
-                      style: TextStyle(fontSize: 20)),
-                  TextField(
-                    controller: recallController,
-                    decoration: const InputDecoration(
-                        hintText: "example: apple chair blue"),
+              const SizedBox(height: 20),
+
+              if (wordsVisible)
+                Text(
+                  shownWords.join("   "),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.bold),
+                )
+              else
+                const Text(
+                  "Now type what you remember",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 18),
+                ),
+
+              const SizedBox(height: 30),
+
+              TextField(
+                controller: recalledController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: "Enter words",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: isRecording ? stopRecording : startRecording,
+                child: Text(
+                    isRecording ? "Stop Recording 🎤" : "Start Recording 🎤"),
+              ),
+              ElevatedButton(
+                onPressed: submitTest,
+                child: const Text("Submit Full Assessment"),
+              ),
+
+              const SizedBox(height: 20),
+
+              // ---------- RESULT UI ----------
+              if (resultText.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.black12,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                      onPressed: submitTest,
-                      child: const Text("Submit")),
-                  const SizedBox(height: 20),
-                  Text(result, style: const TextStyle(fontSize: 22))
-                ],
-              )
-          ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "🧠 Cognitive Result",
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(resultText),
+                      const SizedBox(height: 10),
+                      if (finalResult != null)
+                        Text(
+                          finalResult!["risk"],
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: getRiskColor(finalResult!["risk"]),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+              const SizedBox(height: 20),
+
+              ElevatedButton(
+                onPressed: () {
+                  recalledController.clear();
+                  fetchWords();
+                },
+                child: const Text("Retry"),
+              ),
+            ],
+          ),
         ),
       ),
     );
