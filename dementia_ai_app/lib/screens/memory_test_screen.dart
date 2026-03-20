@@ -5,6 +5,7 @@ import '../services/assessment_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class MemoryTestScreen extends StatefulWidget {
   const MemoryTestScreen({super.key});
@@ -38,6 +39,15 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
   }
 
   Future<void> startRecording() async {
+    var status = await Permission.microphone.request();
+
+    if (!status.isGranted) {
+      setState(() {
+        resultText = "Microphone permission denied ❌";
+      });
+      return;
+    }
+
     final dir = await getTemporaryDirectory();
     audioPath = "${dir.path}/audio.aac";
 
@@ -86,13 +96,13 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
 
     final response = await AssessmentService.submitFullAssessment(
       shownWords.join(","),
-      recalledController.text,
+      recalledController.text.replaceAll(" ",","),
       timeTaken.toDouble(),
       audioPath!, // ✅ REAL AUDIO
     );
 
     if (response != null) {
-      final result = response["result"];
+      final result = response;
 
       setState(() {
         finalResult = result;
