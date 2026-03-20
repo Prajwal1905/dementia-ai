@@ -98,7 +98,7 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
       shownWords.join(","),
       recalledController.text.replaceAll(" ",","),
       timeTaken.toDouble(),
-      audioPath!, // ✅ REAL AUDIO
+      audioPath!, //  REAL AUDIO
     );
 
     if (response != null) {
@@ -201,7 +201,7 @@ ${result["explanation"]}
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        "🧠 Cognitive Result",
+                        " Cognitive Result",
                         style: TextStyle(
                             fontSize: 18, fontWeight: FontWeight.bold),
                       ),

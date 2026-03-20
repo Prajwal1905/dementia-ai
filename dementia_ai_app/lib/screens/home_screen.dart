@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/session.dart';
 import 'login_screen.dart';
 import 'memory_test_screen.dart';
+import 'history_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -25,13 +26,11 @@ class HomeScreen extends StatelessWidget {
           )
         ],
       ),
-
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-
             /// Start Test
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -48,26 +47,25 @@ class HomeScreen extends StatelessWidget {
                 style: TextStyle(fontSize: 16),
               ),
             ),
-            
-          
 
             const SizedBox(height: 20),
-           
+
             /// History (next step)
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 55),
               ),
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("History coming next...")),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HistoryScreen()),
                 );
               },
               child: const Text(
                 "View History",
                 style: TextStyle(fontSize: 16),
               ),
-            ),
+            )
           ],
         ),
       ),
