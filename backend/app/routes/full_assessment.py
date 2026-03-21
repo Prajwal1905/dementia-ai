@@ -11,7 +11,7 @@ from app.services.dependencies import get_current_user
 from app.services.cognitive_score import compute_cognitive_score
 from app.db import SessionLocal
 from app.models.assessment import Assessment
-from app.services.wav2vec_features import extract_audio_features
+
 from sqlalchemy import desc
 
 router = APIRouter()
@@ -49,17 +49,9 @@ async def full_assessment(
     with open(path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # ---------- SPEECH ----------
-    audio_features = extract_audio_features(path)
-
-    # combine with existing features
-    text = audio_features["transcription"]
-
-    features = extract_features(text)
-
-    # override hesitation/repetition with better values
-    features["hesitation_ratio"] = audio_features["hesitation_ratio"]
-    features["repetition_ratio"] = audio_features["repetition_ratio"]
+    # ---------- SPEECH  ----------
+    text = transcribe_audio(path)
+    features = extract_features(text, path)
     delete_file(path)
 
     # ---------- DATABASE ----------
@@ -81,28 +73,8 @@ async def full_assessment(
         decline_rate = 0
 
     # ---------- SPEECH SCORE ----------
-    if not features.get("is_valid_speech",True):
-        speech_score=0
-    else:
-        speech_score=features["speech_score"]
+    speech_score = features["speech_score"]
 
-    if features["vocab_richness"] > 0.7:
-        speech_score += 30
-    elif features["vocab_richness"] > 0.5:
-        speech_score += 20
-    else:
-        speech_score += 10
-
-    if features["hesitation_ratio"] < 0.02:
-        speech_score += 30
-    else:
-        speech_score += 10
-
-    if features["repetition_ratio"] < 0.02:
-        speech_score += 40
-    else:
-        speech_score += 20
-    
     # ---------- FINAL COGNITIVE SCORE ----------
     result = compute_cognitive_score(
         memory_score,
@@ -112,9 +84,8 @@ async def full_assessment(
 
     final_score = result["final_score"]
     final_risk = result["risk"]
-    
 
-    # ---------- ML (OPTIONAL SUPPORT) ----------
+    # ---------- ML ----------
     ml_prediction, confidence = predict_risk({
         "memory_score": memory_score,
         "time_taken": time_taken,
