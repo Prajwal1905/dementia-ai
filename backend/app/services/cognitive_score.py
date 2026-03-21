@@ -21,7 +21,7 @@ def compute_cognitive_score(memory_score, speech_score, decline_rate):
     #  Clamp score (VERY IMPORTANT)
     final_score = int(max(0, min(100, final_score)))
 
-    # ---------- RISK (IMPROVED LOGIC) ----------
+   
     # Priority to memory (clinical relevance)
     if memory_score < 50:
         risk = "Mild Cognitive Impairment"

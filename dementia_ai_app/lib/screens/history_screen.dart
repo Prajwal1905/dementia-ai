@@ -34,7 +34,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (res.statusCode == 200) {
       List temp = jsonDecode(res.body);
 
-      //  SORT BY DATE (IMPORTANT)
       temp.sort((a, b) =>
           DateTime.parse(a["date"]).compareTo(DateTime.parse(b["date"])));
 
@@ -45,10 +44,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  //  BETTER GRAPH POINTS
   List<FlSpot> getSpots() {
     return List.generate(data.length, (i) {
-      return FlSpot(i.toDouble(), (data[i]["cognitive_score"] ?? 0).toDouble());
+      return FlSpot(
+        i.toDouble(),
+        (data[i]["cognitive_score"] ?? 0).toDouble(),
+      );
     });
   }
 
@@ -68,7 +69,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Cognitive History")),
-
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : data.isEmpty
@@ -84,9 +84,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             fontSize: 18, fontWeight: FontWeight.bold),
                       ),
 
+                      const SizedBox(height: 10),
+
+                      
+                      Text(
+                        "Latest Score: ${data.last["cognitive_score"]}",
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+
                       const SizedBox(height: 20),
 
-                      //  IMPROVED GRAPH
+                      
                       SizedBox(
                         height: 250,
                         child: LineChart(
@@ -101,28 +110,61 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               border: Border.all(color: Colors.grey),
                             ),
 
+                            
                             titlesData: FlTitlesData(
                               leftTitles: AxisTitles(
                                 sideTitles: SideTitles(
                                   showTitles: true,
                                   interval: 20,
+                                  reservedSize: 30,
                                 ),
                               ),
-                              
+
+                              bottomTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  interval: 1,
+                                  getTitlesWidget: (value, meta) {
+                                    if (value % 1 != 0) return const SizedBox();
+
+                                    int index = value.toInt();
+                                    if (index >= data.length) {
+                                      return const SizedBox();
+                                    }
+
+                                    return Text("T${index + 1}");
+                                  },
+                                ),
+                              ),
+                            ),
+
+                            
+                            lineTouchData: LineTouchData(
+                              touchTooltipData: LineTouchTooltipData(
+                                getTooltipItems: (spots) {
+                                  return spots.map((spot) {
+                                    return LineTooltipItem(
+                                      "Score: ${spot.y.toStringAsFixed(1)}",
+                                      const TextStyle(color: Colors.white),
+                                    );
+                                  }).toList();
+                                },
+                              ),
                             ),
 
                             lineBarsData: [
                               LineChartBarData(
                                 spots: getSpots(),
                                 isCurved: true,
-                                barWidth: 4,
+                                curveSmoothness: 0.3,
+                                barWidth: 3,
                                 color: Colors.blue,
 
                                 dotData: FlDotData(show: true),
 
                                 belowBarData: BarAreaData(
                                   show: true,
-                                  color: Colors.blue.withOpacity(0.2),
+                                  color: Colors.blue.withOpacity(0.15),
                                 ),
                               ),
                             ],
@@ -132,7 +174,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                       const SizedBox(height: 20),
 
-                      //  LIST
+                      
                       Expanded(
                         child: ListView.builder(
                           itemCount: data.length,
@@ -150,14 +192,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                               elevation: 3,
                               margin: const EdgeInsets.symmetric(vertical: 8),
-
                               child: ListTile(
                                 title: Text(
                                   " Score: ${score.toStringAsFixed(1)}",
                                   style: const TextStyle(
                                       fontWeight: FontWeight.bold),
                                 ),
-
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -174,7 +214,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     ),
                                   ],
                                 ),
-
                                 trailing: Text(
                                   item["risk_level"],
                                   style: TextStyle(
