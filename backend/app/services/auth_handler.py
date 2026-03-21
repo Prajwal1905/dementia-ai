@@ -1,7 +1,11 @@
+import os
+from dotenv import load_dotenv
 from jose import jwt
 from datetime import datetime, timedelta
 
-SECRET = "supersecretkey"
+load_dotenv()
+
+SECRET = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 
 def create_token(user_id: int):

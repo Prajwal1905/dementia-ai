@@ -1,9 +1,21 @@
 import whisper
 import re
 
-model = whisper.load_model("base")
+model = None  # global
+
+
+def get_model():
+    global model
+    if model is None:
+        print(" Loading Whisper model...")
+        model = whisper.load_model("tiny")
+    else:
+        print(" Whisper already loaded")
+    return model
+
 
 def transcribe_audio(path):
+    model = get_model()
     result = model.transcribe(path)
     return result["text"]
 

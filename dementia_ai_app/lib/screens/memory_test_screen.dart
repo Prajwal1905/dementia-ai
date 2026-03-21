@@ -21,11 +21,13 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
   bool wordsVisible = true;
   DateTime? startTime;
 
-  String resultText = "";
   Map<String, dynamic>? finalResult;
+
   FlutterSoundRecorder? recorder;
   bool isRecording = false;
+  bool isLoading = false; // ✅ NEW
   String? audioPath;
+
   @override
   void initState() {
     super.initState();
@@ -42,9 +44,9 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
     var status = await Permission.microphone.request();
 
     if (!status.isGranted) {
-      setState(() {
-        resultText = "Microphone permission denied ❌";
-      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Microphone permission denied ❌")),
+      );
       return;
     }
 
@@ -52,7 +54,6 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
     audioPath = "${dir.path}/audio.aac";
 
     await recorder!.startRecorder(toFile: audioPath);
-
     setState(() => isRecording = true);
   }
 
@@ -71,7 +72,6 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
     setState(() {
       shownWords = List<String>.from(data["words"]);
       wordsVisible = true;
-      resultText = "";
       finalResult = null;
     });
 
@@ -82,46 +82,37 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
     });
   }
 
-  // ---------- SUBMIT FULL ASSESSMENT ----------
+  // ---------- SUBMIT ----------
   Future<void> submitTest() async {
     if (audioPath == null) {
-      setState(() {
-        resultText = "Please record audio first 🎤";
-      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please record audio first 🎤")),
+      );
       return;
     }
 
     final endTime = DateTime.now();
     final timeTaken = endTime.difference(startTime!).inSeconds;
 
+    setState(() => isLoading = true);
+
     final response = await AssessmentService.submitFullAssessment(
       shownWords.join(","),
-      recalledController.text.replaceAll(" ",","),
+      recalledController.text.replaceAll(" ", ","),
       timeTaken.toDouble(),
-      audioPath!, //  REAL AUDIO
+      audioPath!,
     );
 
+    setState(() => isLoading = false);
+
     if (response != null) {
-      final result = response;
-
       setState(() {
-        finalResult = result;
-
-        resultText = """
-Memory Score: ${result["memory_score"]}
-
-Risk: ${result["risk"]}
-
-Confidence: ${result["confidence"]}%
-
-AI Insight:
-${result["explanation"]}
-""";
+        finalResult = response;
       });
     } else {
-      setState(() {
-        resultText = "Assessment failed ❌";
-      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Assessment failed ❌")),
+      );
     }
   }
 
@@ -177,11 +168,13 @@ ${result["explanation"]}
               ),
 
               const SizedBox(height: 20),
+
               ElevatedButton(
                 onPressed: isRecording ? stopRecording : startRecording,
                 child: Text(
-                    isRecording ? "Stop Recording 🎤" : "Start Recording 🎤"),
+                    isRecording ? "Stop Recording " : "Start Recording "),
               ),
+
               ElevatedButton(
                 onPressed: submitTest,
                 child: const Text("Submit Full Assessment"),
@@ -189,34 +182,100 @@ ${result["explanation"]}
 
               const SizedBox(height: 20),
 
-              // ---------- RESULT UI ----------
-              if (resultText.isNotEmpty)
+              // ---------- LOADING ----------
+              if (isLoading)
+                const Center(
+                  child: Column(
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 10),
+                      Text("Analyzing... Please wait ⏳"),
+                    ],
+                  ),
+                ),
+
+              const SizedBox(height: 20),
+
+              // ---------- RESULT ----------
+              if (finalResult != null)
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.black12,
-                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 10,
+                        offset: Offset(0, 4),
+                      )
+                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        " Cognitive Result",
+                        " Cognitive Health Report",
                         style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
+                            fontSize: 20, fontWeight: FontWeight.bold),
                       ),
-                      const SizedBox(height: 10),
-                      Text(resultText),
-                      const SizedBox(height: 10),
-                      if (finalResult != null)
-                        Text(
-                          finalResult!["risk"],
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: getRiskColor(finalResult!["risk"]),
+
+                      const SizedBox(height: 20),
+
+                      // SCORE
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Score: ${finalResult!["cognitive_score"]}",
+                            style: const TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
                           ),
-                        ),
+                          Text(
+                            finalResult!["risk"],
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: getRiskColor(finalResult!["risk"]),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      LinearProgressIndicator(
+                        value: finalResult!["cognitive_score"] / 100,
+                        minHeight: 8,
+                        backgroundColor: Colors.grey[300],
+                        color: getRiskColor(finalResult!["risk"]),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      const Text("📌 Summary",
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text(finalResult!["summary"]),
+
+                      const SizedBox(height: 15),
+
+                      const Text("💡 AI Insights",
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      ...List.generate(
+                        finalResult!["insights"].length,
+                        (i) => Text("• ${finalResult!["insights"][i]}"),
+                      ),
+
+                      const SizedBox(height: 15),
+
+                      const Text(" Recommendation",
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text(finalResult!["recommendation"]),
+
+                      const SizedBox(height: 20),
+
+                      Text("Memory Score: ${finalResult!["memory_score"]}"),
+                      Text("Confidence: ${finalResult!["confidence"]}%"),
                     ],
                   ),
                 ),

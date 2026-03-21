@@ -46,6 +46,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
   }
 
+  Color getRiskColor(String risk) {
+    if (risk.contains("High")) return Colors.red;
+    if (risk.contains("Mild")) return Colors.orange;
+    return Colors.green;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -61,7 +67,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     children: [
 
                       const Text(
-                        "Memory Score Trend",
+                        "📈 Memory Score Trend",
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
 
@@ -71,13 +77,35 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         height: 250,
                         child: LineChart(
                           LineChartData(
-                            titlesData: FlTitlesData(show: true),
-                            borderData: FlBorderData(show: true),
+                            minY: 0,
+                            maxY: 100,
+
+                            gridData: FlGridData(show: true),
+
+                            borderData: FlBorderData(
+                              show: true,
+                              border: Border.all(color: Colors.grey),
+                            ),
+
+                            titlesData: FlTitlesData(
+                              leftTitles: AxisTitles(
+                                sideTitles: SideTitles(showTitles: true),
+                              ),
+                              bottomTitles: AxisTitles(
+                                sideTitles: SideTitles(showTitles: true),
+                              ),
+                            ),
+
                             lineBarsData: [
                               LineChartBarData(
                                 spots: getSpots(),
                                 isCurved: true,
                                 barWidth: 4,
+                                color: Colors.blue,
+                                belowBarData: BarAreaData(
+                                  show: true,
+                                  color: Colors.blue.withOpacity(0.2),
+                                ),
                                 dotData: FlDotData(show: true),
                               ),
                             ],
@@ -94,10 +122,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             final item = data[i];
 
                             return Card(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 3,
                               child: ListTile(
-                                title: Text("Score: ${item["memory_score"]}"),
+                                title: Text(
+                                  "🧠 Score: ${item["memory_score"]}",
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                ),
                                 subtitle: Text(
-                                    "Risk: ${item["risk_level"]}\nDecline: ${item["decline_rate"]}"),
+                                  "Decline: ${item["decline_rate"]}",
+                                ),
+                                trailing: Text(
+                                  item["risk_level"],
+                                  style: TextStyle(
+                                    color: getRiskColor(item["risk_level"]),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             );
                           },
