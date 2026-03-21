@@ -21,6 +21,7 @@ def get_history(user_id: int = Depends(get_current_user)):
         {
             "date": r.created_at,
             "memory_score": r.memory_score,
+            "cognitive_score": r.cognitive_score,
             "time_taken": r.time_taken,
             "decline_rate": r.decline_rate,
             "avg_sentence_length": r.avg_sentence_length,

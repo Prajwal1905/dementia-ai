@@ -42,7 +42,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   List<FlSpot> getSpots() {
     return List.generate(data.length, (i) {
-      return FlSpot(i.toDouble(), data[i]["memory_score"].toDouble());
+      return FlSpot(i.toDouble(), data[i]["cognitive_score"].toDouble());
     });
   }
 

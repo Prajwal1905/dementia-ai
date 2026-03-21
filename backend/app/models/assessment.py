@@ -9,18 +9,18 @@ class Assessment(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
 
     memory_score = Column(Float)
-    time_taken = Column(Float)          # NEW
+    time_taken = Column(Float)          
 
     avg_sentence_length = Column(Float)
     vocab_richness = Column(Float)
     hesitation_ratio = Column(Float)
     repetition_ratio = Column(Float)
 
-    decline_rate = Column(Float)        # NEW
+    decline_rate = Column(Float)        
 
     ml_prediction = Column(Integer)
     confidence = Column(Float)
 
     risk_level = Column(String)
-
+    cognitive_score = Column(Integer)
     created_at = Column(DateTime, default=datetime.utcnow)

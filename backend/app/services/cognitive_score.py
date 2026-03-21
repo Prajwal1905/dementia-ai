@@ -1,6 +1,6 @@
 def compute_cognitive_score(memory_score, speech_score, decline_rate):
     """
-    Central brain function for cognitive scoring
+    Central brain function for cognitive scoring (0–100 safe, realistic)
     """
 
     # ---------- DECLINE SCORE ----------
@@ -12,14 +12,20 @@ def compute_cognitive_score(memory_score, speech_score, decline_rate):
         decline_score = 40
 
     # ---------- FINAL SCORE ----------
-    final_score = int(
+    final_score = (
         memory_score * 0.4 +
         speech_score * 0.3 +
         decline_score * 0.3
     )
 
-    # ---------- RISK ----------
-    if final_score >= 75:
+    #  Clamp score (VERY IMPORTANT)
+    final_score = int(max(0, min(100, final_score)))
+
+    # ---------- RISK (IMPROVED LOGIC) ----------
+    # Priority to memory (clinical relevance)
+    if memory_score < 50:
+        risk = "Mild Cognitive Impairment"
+    elif final_score >= 75:
         risk = "Normal"
     elif final_score >= 50:
         risk = "Mild Cognitive Impairment"
