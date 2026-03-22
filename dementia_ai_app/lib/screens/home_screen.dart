@@ -3,6 +3,7 @@ import '../services/session.dart';
 import 'login_screen.dart';
 import 'memory_test_screen.dart';
 import 'history_screen.dart';
+import 'logic_test_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});

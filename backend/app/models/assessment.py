@@ -26,3 +26,7 @@ class Assessment(Base):
     trend = Column(String, nullable=True)
     change = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    predicted_score = Column(Float)
+    prediction_message = Column(String)
+    logic_score=Column(Float,nullable=True)
+    

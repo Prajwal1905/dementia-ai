@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from app.routes import report,speech,full_assessment,history,auth,memory
+from app.routes.logic import router as logic_router
 from app.db import engine, Base
 from app.models.assessment import Assessment
 from app.services.speech_features import get_model
@@ -15,7 +16,7 @@ app.include_router(full_assessment.router)
 app.include_router(history.router)
 app.include_router(auth.router)
 app.include_router(memory.router)
-
+app.include_router(logic_router)
 
 @app.get("/")
 def home():

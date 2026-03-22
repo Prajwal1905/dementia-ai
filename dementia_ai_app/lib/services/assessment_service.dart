@@ -2,16 +2,19 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'api.dart';
 import 'session.dart';
+import 'dart:io';
 
 class AssessmentService {
   static Future<Map<String, dynamic>?> submitFullAssessment(
-    String shownWords,
-    String recalledWords,
-    double timeTaken,
-    String audioPath,
-  ) async {
+      String shownWords,
+      String recalledWords,
+      double timeTaken,
+      String audioPath,
+      double logicScore) async {
     final token = await Session.getToken();
 
+    final file = File(audioPath);
+    print("uploading audio size: ${file.lengthSync()}");
     var request = http.MultipartRequest(
       "POST",
       Uri.parse("${Api.baseUrl}/full-assessment"),
@@ -23,10 +26,15 @@ class AssessmentService {
     request.fields["shown_words"] = shownWords;
     request.fields["recalled_words"] = recalledWords;
     request.fields["time_taken"] = timeTaken.toString();
+    request.fields["logic_score"] = logicScore.toString();
 
-    // audio file
     request.files.add(
-      await http.MultipartFile.fromPath("file", audioPath),
+      http.MultipartFile(
+        'file',
+        file.readAsBytes().asStream(),
+        file.lengthSync(),
+        filename: audioPath.split('/').last,
+      ),
     );
 
     var response = await request.send();

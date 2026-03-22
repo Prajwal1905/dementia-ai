@@ -32,7 +32,8 @@ X = df[[
     "vocab_richness",
     "hesitation_ratio",
     "repetition_ratio",
-    "decline_rate"
+    "decline_rate",
+    "logic_score"
 ]]
 
 y = df["label"]

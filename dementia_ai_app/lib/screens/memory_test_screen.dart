@@ -15,18 +15,30 @@ class MemoryTestScreen extends StatefulWidget {
 }
 
 class _MemoryTestScreenState extends State<MemoryTestScreen> {
+  // ---------------- MEMORY ----------------
   List<String> shownWords = [];
   final recalledController = TextEditingController();
-
   bool wordsVisible = true;
   DateTime? startTime;
 
-  Map<String, dynamic>? finalResult;
-
+  // ---------------- SPEECH ----------------
   FlutterSoundRecorder? recorder;
   bool isRecording = false;
-  bool isLoading = false; // ✅ NEW
   String? audioPath;
+
+  // ---------------- LOGIC ----------------
+  String logicQuestion = "";
+  String logicQId = "";
+  String logicSessionId = "";
+  int logicCount = 0;
+  final logicController = TextEditingController();
+  bool logicLoading = false;
+
+  // ---------------- GLOBAL ----------------
+  int stage = 0; // 0=memory/speech, 1=logic, 2=final
+  double logicScore = 0;
+  bool isLoading = false;
+  Map<String, dynamic>? finalResult;
 
   @override
   void initState() {
@@ -40,15 +52,29 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
     await recorder!.openRecorder();
   }
 
+  // ---------------- MEMORY ----------------
+  Future<void> fetchWords() async {
+    final res = await http.get(Uri.parse("${Api.baseUrl}/memory/words"));
+
+    final data = jsonDecode(res.body);
+
+    setState(() {
+      shownWords = List<String>.from(data["words"]);
+      wordsVisible = true;
+    });
+
+    startTime = DateTime.now();
+
+    Future.delayed(const Duration(seconds: 5), () {
+      setState(() => wordsVisible = false);
+    });
+  }
+
+  // ---------------- SPEECH ----------------
   Future<void> startRecording() async {
     var status = await Permission.microphone.request();
 
-    if (!status.isGranted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Microphone permission denied ❌")),
-      );
-      return;
-    }
+    if (!status.isGranted) return;
 
     final dir = await getTemporaryDirectory();
     audioPath = "${dir.path}/audio.aac";
@@ -62,37 +88,60 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
     setState(() => isRecording = false);
   }
 
-  // ---------- FETCH WORDS ----------
-  Future<void> fetchWords() async {
-    final res = await http.get(
-      Uri.parse("${Api.baseUrl}/memory/words"),
-    );
+  // ---------------- LOGIC ----------------
+  Future<void> startLogicSession() async {
+    final res = await http.post(Uri.parse("${Api.baseUrl}/logic/start"));
 
     final data = jsonDecode(res.body);
+    logicSessionId = data["session_id"];
+
+    fetchLogicQuestion();
+  }
+
+  Future<void> fetchLogicQuestion() async {
+    setState(() => logicLoading = true);
+
+    final res = await http.get(Uri.parse(
+        "${Api.baseUrl}/logic/session/question?session_id=$logicSessionId"));
+
+    final data = jsonDecode(res.body);
+
     setState(() {
-      shownWords = List<String>.from(data["words"]);
-      wordsVisible = true;
-      finalResult = null;
-    });
-
-    startTime = DateTime.now();
-
-    Future.delayed(const Duration(seconds: 5), () {
-      setState(() => wordsVisible = false);
+      logicQuestion = data["question"];
+      logicQId = data["q_id"];
+      logicLoading = false;
     });
   }
 
-  // ---------- SUBMIT ----------
-  Future<void> submitTest() async {
-    if (audioPath == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please record audio first 🎤")),
-      );
-      return;
-    }
+  Future<void> submitLogicAnswer() async {
+    await http.post(Uri.parse(
+        "${Api.baseUrl}/logic/session/answer?session_id=$logicSessionId&q_id=$logicQId&user_answer=${logicController.text}"));
 
-    final endTime = DateTime.now();
-    final timeTaken = endTime.difference(startTime!).inSeconds;
+    logicController.clear();
+    logicCount++;
+
+    if (logicCount >= 5) {
+      final res = await http.get(Uri.parse(
+          "${Api.baseUrl}/logic/session/result?session_id=$logicSessionId"));
+
+      final data = jsonDecode(res.body);
+      logicScore = (data["logic_score"] ?? 0).toDouble();
+
+      setState(() => stage = 2);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Logic Score: $logicScore")),
+      );
+    } else {
+      fetchLogicQuestion();
+    }
+  }
+
+  // ---------------- FINAL SUBMIT ----------------
+  Future<void> submitTest() async {
+    if (audioPath == null) return;
+
+    final timeTaken = DateTime.now().difference(startTime!).inSeconds;
 
     setState(() => isLoading = true);
 
@@ -101,29 +150,23 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
       recalledController.text.replaceAll(" ", ","),
       timeTaken.toDouble(),
       audioPath!,
+      logicScore,
     );
 
     setState(() => isLoading = false);
 
     if (response != null) {
-      setState(() {
-        finalResult = response;
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Assessment failed ❌")),
-      );
+      setState(() => finalResult = response);
     }
   }
 
-  // ---------- RISK COLOR ----------
   Color getRiskColor(String risk) {
     if (risk.contains("High")) return Colors.red;
     if (risk.contains("Mild")) return Colors.orange;
     return Colors.green;
   }
 
-  // ---------- UI ----------
+  // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -132,74 +175,71 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
         padding: const EdgeInsets.all(20),
         child: SingleChildScrollView(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                "Memorize these words",
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 20),
-              ),
-
-              const SizedBox(height: 20),
-
-              if (wordsVisible)
-                Text(
-                  shownWords.join("   "),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.bold),
-                )
-              else
-                const Text(
-                  "Now type what you remember",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 18),
+              /// ---------------- MEMORY ----------------
+              if (stage == 0) ...[
+                const Text("Memorize words", style: TextStyle(fontSize: 20)),
+                const SizedBox(height: 20),
+                wordsVisible
+                    ? Text(shownWords.join(" "),
+                        style: const TextStyle(fontSize: 22))
+                    : const Text("Enter recalled words"),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: recalledController,
+                  decoration:
+                      const InputDecoration(border: OutlineInputBorder()),
                 ),
-
-              const SizedBox(height: 30),
-
-              TextField(
-                controller: recalledController,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: "Enter words",
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: isRecording ? stopRecording : startRecording,
+                  child:
+                      Text(isRecording ? "Stop Recording" : "Start Recording"),
                 ),
-              ),
-
-              const SizedBox(height: 20),
-
-              ElevatedButton(
-                onPressed: isRecording ? stopRecording : startRecording,
-                child: Text(
-                    isRecording ? "Stop Recording " : "Start Recording "),
-              ),
-
-              ElevatedButton(
-                onPressed: submitTest,
-                child: const Text("Submit Full Assessment"),
-              ),
-
-              const SizedBox(height: 20),
-
-              // ---------- LOADING ----------
-              if (isLoading)
-                const Center(
-                  child: Column(
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 10),
-                      Text("Analyzing... Please wait ⏳"),
-                    ],
-                  ),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() => stage = 1);
+                    startLogicSession();
+                  },
+                  child: const Text("Next: Logic Test"),
                 ),
+              ],
+
+              /// ---------------- LOGIC ----------------
+              if (stage == 1) ...[
+                logicLoading
+                    ? const CircularProgressIndicator()
+                    : Column(
+                        children: [
+                          Text(logicQuestion,
+                              style: const TextStyle(fontSize: 18)),
+                          const SizedBox(height: 20),
+                          TextField(controller: logicController),
+                          const SizedBox(height: 20),
+                          ElevatedButton(
+                            onPressed: submitLogicAnswer,
+                            child: const Text("Submit Answer"),
+                          ),
+                        ],
+                      )
+              ],
+
+              /// ---------------- FINAL ----------------
+              if (stage == 2) ...[
+                ElevatedButton(
+                  onPressed: submitTest,
+                  child: const Text("Submit Final Assessment"),
+                ),
+              ],
 
               const SizedBox(height: 20),
 
-              // ---------- RESULT ----------
+              if (isLoading) const CircularProgressIndicator(),
+
               if (finalResult != null)
                 Container(
                   padding: const EdgeInsets.all(20),
+                  margin: const EdgeInsets.only(top: 20),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
@@ -215,14 +255,14 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        " Cognitive Health Report",
+                        "🧠 Cognitive Health Report",
                         style: TextStyle(
                             fontSize: 20, fontWeight: FontWeight.bold),
                       ),
 
                       const SizedBox(height: 20),
 
-                      // SCORE
+                      /// SCORE + RISK
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -253,13 +293,24 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
 
                       const SizedBox(height: 20),
 
-                      const Text("📌 Summary",
+                      /// EXTRA SCORES 
+                      Text("Logic Score: $logicScore"),
+                      Text(" Memory Score: ${finalResult!["memory_score"]}"),
+                      Text(
+                          " Speech Score: ${finalResult!["speech_features"]["speech_score"]}"),
+                      Text(" Decline Rate: ${finalResult!["decline_rate"]}"),
+
+                      const SizedBox(height: 20),
+
+                      /// SUMMARY
+                      const Text(" Summary",
                           style: TextStyle(fontWeight: FontWeight.bold)),
                       Text(finalResult!["summary"]),
 
                       const SizedBox(height: 15),
 
-                      const Text("💡 AI Insights",
+                      /// INSIGHTS
+                      const Text(" AI Insights",
                           style: TextStyle(fontWeight: FontWeight.bold)),
                       ...List.generate(
                         finalResult!["insights"].length,
@@ -268,27 +319,18 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
 
                       const SizedBox(height: 15),
 
+                      /// RECOMMENDATION
                       const Text(" Recommendation",
                           style: TextStyle(fontWeight: FontWeight.bold)),
                       Text(finalResult!["recommendation"]),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 15),
 
-                      Text("Memory Score: ${finalResult!["memory_score"]}"),
+                      /// CONFIDENCE
                       Text("Confidence: ${finalResult!["confidence"]}%"),
                     ],
                   ),
-                ),
-
-              const SizedBox(height: 20),
-
-              ElevatedButton(
-                onPressed: () {
-                  recalledController.clear();
-                  fetchWords();
-                },
-                child: const Text("Retry"),
-              ),
+                )
             ],
           ),
         ),

@@ -31,6 +31,7 @@ async def full_assessment(
     shown_words: str = Form(...),
     recalled_words: str = Form(...),
     time_taken: float = Form(...),
+    logic_score:float=Form(0),
     user_id: int = Depends(get_current_user)
 ):
 
@@ -79,7 +80,8 @@ async def full_assessment(
     result = compute_cognitive_score(
         memory_score,
         speech_score,
-        decline_rate
+        decline_rate,
+        logic_score
     )
 
     final_score = result["final_score"]
@@ -97,14 +99,42 @@ async def full_assessment(
         change = 0
 
     if change < -10:
-        trend = " Significant decline detected"
+        trend = "Significant decline detected"
     elif change < -5:
-        trend = " Slight decline observed"
+        trend = "Slight decline observed"
     elif change > 5:
-        trend = " Improvement observed"
+        trend = "Improvement observed"
     else:
-        trend = " Stable performance"
+        trend = "Stable performance"
+    
+    # ---------- FUTURE PREDICTION 
+    previous_scores = [r.cognitive_score for r in records]
 
+    if len(previous_scores) >= 3:
+        recent_scores = previous_scores[-5:]  # last 5 records
+
+    # simple linear trend (difference-based)
+        diffs = [
+            recent_scores[i] - recent_scores[i - 1]
+            for i in range(1, len(recent_scores))
+        ]
+
+        avg_diff = sum(diffs) / len(diffs)
+
+    # predict next score
+        predicted_score = final_score + avg_diff
+
+    # clamp between 0–100
+        predicted_score = max(0, min(100, predicted_score))
+    else:
+        predicted_score = final_score
+    
+    if predicted_score < final_score - 5:
+        prediction_msg = "Risk may increase soon"
+    elif predicted_score > final_score + 5:
+        prediction_msg = "Improvement likely"
+    else:
+        prediction_msg = "Likely to remain stable"
     # ---------- ML ----------
     ml_prediction, confidence = predict_risk({
         "memory_score": memory_score,
@@ -113,7 +143,8 @@ async def full_assessment(
         "vocab_richness": features["vocab_richness"],
         "hesitation_ratio": features["hesitation_ratio"],
         "repetition_ratio": features["repetition_ratio"],
-        "decline_rate": decline_rate
+        "decline_rate": decline_rate,
+        "logic_score":logic_score
     })
 
     # ---------- EXPLANATION ----------
@@ -143,6 +174,9 @@ async def full_assessment(
         risk_level=final_risk,
         trend=trend,
         change=change,
+        predicted_score=predicted_score,
+        prediction_message=prediction_msg,
+        logic_score=logic_score
     )
 
     db.add(record)
@@ -164,5 +198,7 @@ async def full_assessment(
         "insights": explanation["insights"],
         "trend": trend,
         "change": round(change, 2),
-        "recommendation": explanation["recommendation"]
+        "recommendation": explanation["recommendation"],
+        "predicted_score": round(predicted_score, 2),
+        "prediction_message": prediction_msg,
     }

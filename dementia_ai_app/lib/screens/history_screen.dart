@@ -214,7 +214,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                       const SizedBox(height: 15),
 
-                      // 🔥 Latest Analysis (Clean UI)
+                      //  Latest Analysis
                       if (filtered.isNotEmpty)
                         Container(
                           width: double.infinity,
@@ -235,7 +235,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                "🧠 Latest Analysis",
+                                " Latest Analysis",
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -244,21 +244,34 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                               const SizedBox(height: 12),
 
-                              // Score + Risk in one row
+                              // Score + Risk
                               Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     "Score: ${filtered.first["cognitive_score"]}",
-                                    style: const TextStyle(fontSize: 15),
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                  Text(
-                                    filtered.first["risk_level"],
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
                                       color: getRiskColor(
-                                          filtered.first["risk_level"]),
+                                              filtered.first["risk_level"])
+                                          .withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      filtered.first["risk_level"],
+                                      style: TextStyle(
+                                        color: getRiskColor(
+                                            filtered.first["risk_level"]),
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -290,25 +303,73 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                               const SizedBox(height: 10),
 
-                              // 🔥 NEW TREND
+                              // Trend highlight
                               if (filtered.first["trend"] != null)
-                                Text(
-                                  filtered.first["trend"],
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.deepPurple,
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.deepPurple.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    filtered.first["trend"],
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.deepPurple,
+                                    ),
                                   ),
                                 ),
 
                               if (filtered.first["change"] != null)
-                                Text(
-                                  "Change: ${filtered.first["change"]}",
-                                  style: const TextStyle(fontSize: 13),
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Text(
+                                    "Change: ${filtered.first["change"]}",
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
                                 ),
                             ],
                           ),
                         ),
 
+                      // 🔮 Future Prediction
+                      if (filtered.isNotEmpty &&
+                          filtered.first["predicted_score"] != null)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          margin: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "🔮 Future Prediction",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                "Expected Score: ${filtered.first["predicted_score"]}",
+                                style: const TextStyle(fontSize: 15),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                filtered.first["prediction_message"] ?? "",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
                       const SizedBox(height: 15),
 
                       Expanded(

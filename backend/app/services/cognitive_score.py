@@ -1,4 +1,4 @@
-def compute_cognitive_score(memory_score, speech_score, decline_rate):
+def compute_cognitive_score(memory_score, speech_score, decline_rate,logic_score):
     """
     Central brain function for cognitive scoring (0–100 safe, realistic)
     """
@@ -13,9 +13,11 @@ def compute_cognitive_score(memory_score, speech_score, decline_rate):
 
     # ---------- FINAL SCORE ----------
     final_score = (
-        memory_score * 0.4 +
-        speech_score * 0.3 +
-        decline_score * 0.3
+        memory_score * 0.35 +
+        speech_score * 0.25 +
+        logic_score *0.25 +
+        decline_score * 0.15
+
     )
 
     #  Clamp score (VERY IMPORTANT)
