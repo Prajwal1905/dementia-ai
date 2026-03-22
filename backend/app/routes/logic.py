@@ -1,14 +1,16 @@
 from fastapi import APIRouter
-from app.services.logic_generator import generate_question
+from app.services.logic_generator import generate_question_set
 import time
 
 router = APIRouter()
 
 QUESTION_STORE = {}
-SESSION_STORE= {}
+SESSION_STORE = {}
+
 @router.get("/logic/question")
 def get_question(difficulty: int = 1):
-    q = generate_question(difficulty)
+    questions = generate_question_set()
+    q = questions[0]
 
     q_id = str(len(QUESTION_STORE) + 1)
     QUESTION_STORE[q_id] = q["answer"]
@@ -16,10 +18,12 @@ def get_question(difficulty: int = 1):
     return {
         "id": q_id,
         "type": q["type"],
-        "difficulty": q["difficulty"],
+        "difficulty": difficulty,
         "question": q["question"]
     }
 
+
+# ---------------- SINGLE ANSWER (KEEP) ----------------
 @router.post("/logic/answer")
 def submit_answer(q_id: str, user_answer: str):
     correct_answer = QUESTION_STORE.get(q_id)
@@ -27,60 +31,64 @@ def submit_answer(q_id: str, user_answer: str):
     if not correct_answer:
         return {"error": "Invalid question ID"}
 
-    # normalize answers
     user = str(user_answer).strip().lower()
     correct = str(correct_answer).strip().lower()
 
     is_correct = user == correct
 
-    score = 100 if is_correct else 0
-
     return {
         "correct": is_correct,
-        "score": score,
+        "score": 100 if is_correct else 0,
         "correct_answer": correct_answer
     }
 
+
+# ---------------- START SESSION ----------------
 @router.post("/logic/start")
 def start_session():
     session_id = str(len(SESSION_STORE) + 1)
 
+    questions = generate_question_set()  
+
     SESSION_STORE[session_id] = {
-        "questions": [],
+        "questions": questions,
         "answers": [],
         "score": 0,
         "current_q": 0,
-        "difficulty":1
+        "difficulty": 1
     }
 
     return {"session_id": session_id}
 
 
+# ---------------- GET SESSION QUESTION ----------------
 @router.get("/logic/session/question")
 def get_session_question(session_id: str):
     session = SESSION_STORE.get(session_id)
 
     if not session:
         return {"error": "Invalid session"}
-    difficulty=session["difficulty"]
 
-    q = generate_question(difficulty)
+    if session["current_q"] >= len(session["questions"]):
+        return {"message": "No more questions"}
+
+    q = session["questions"][session["current_q"]]
 
     q_id = f"{session_id}_{session['current_q']}"
     QUESTION_STORE[q_id] = q["answer"]
 
-    session["questions"].append({
-        "question":q,
-        "start_time":time.time()
-    })
+    session["questions"][session["current_q"]]["start_time"] = time.time()
     session["current_q"] += 1
 
     return {
         "q_id": q_id,
         "question": q["question"],
-        "difficulty": q["difficulty"]
+        "type": q["type"],
+        "difficulty": session["difficulty"]
     }
 
+
+# ---------------- SUBMIT SESSION ANSWER ----------------
 @router.post("/logic/session/answer")
 def submit_session_answer(session_id: str, q_id: str, user_answer: str):
     session = SESSION_STORE.get(session_id)
@@ -93,28 +101,24 @@ def submit_session_answer(session_id: str, q_id: str, user_answer: str):
     if not correct_answer:
         return {"error": "Invalid question"}
 
-    # normalize
     user = str(user_answer).strip().lower()
     correct = str(correct_answer).strip().lower()
 
     is_correct = user == correct
 
-    # GET LAST QUESTION DATA
-    last_q = session["questions"][-1]
+    # get last question
+    last_q = session["questions"][session["current_q"] - 1]
 
-    start_time = last_q["start_time"]
+    start_time = last_q.get("start_time", time.time())
     time_taken = time.time() - start_time
 
-    difficulty = last_q["question"]["difficulty"]
+    difficulty = session["difficulty"]
 
-    #  SMART SCORING
+    # ---------- SMART SCORING ----------
     if is_correct:
         base = 100
-
-        # difficulty weight
         diff_weight = {1: 1, 2: 1.5, 3: 2}[difficulty]
 
-        # time factor
         if time_taken < 5:
             time_factor = 1.2
         elif time_taken < 10:
@@ -134,11 +138,12 @@ def submit_session_answer(session_id: str, q_id: str, user_answer: str):
         "time_taken": round(time_taken, 2),
         "score": round(score, 2)
     })
-     
+
+    # ---------- ADAPTIVE DIFFICULTY ----------
     if is_correct:
-        session["difficulty"]=min(3,session["difficulty"]+1)
+        session["difficulty"] = min(3, session["difficulty"] + 1)
     else:
-        session["difficulty"]=max(1,session["difficulty"]-1)
+        session["difficulty"] = max(1, session["difficulty"] - 1)
 
     return {
         "correct": is_correct,
@@ -147,14 +152,16 @@ def submit_session_answer(session_id: str, q_id: str, user_answer: str):
         "current_score": round(session["score"], 2),
         "difficulty": difficulty,
         "message": (
-           "Excellent speed!"
-           if is_correct and time_taken < 5
-           else "Good"
-           if is_correct
-           else " Incorrect"
+            "Excellent speed!"
+            if is_correct and time_taken < 5
+            else "Good"
+            if is_correct
+            else "Incorrect"
         )
     }
 
+
+# ---------------- RESULT ----------------
 @router.get("/logic/session/result")
 def get_session_result(session_id: str):
     session = SESSION_STORE.get(session_id)
@@ -170,5 +177,5 @@ def get_session_result(session_id: str):
     return {
         "total_questions": total_questions,
         "logic_score": round(avg_score, 2),
-        "raw_score": round(session["score"], 2)
+        "raw_score": round(total_score, 2)
     }

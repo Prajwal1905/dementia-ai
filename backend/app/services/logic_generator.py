@@ -1,89 +1,137 @@
 import random
 
 
-def generate_math(difficulty):
-    if difficulty == 1:
-        a = random.randint(50, 150)
-        b = random.randint(10, 40)
-        question = f"You have ₹{a}. You spend ₹{b}. How much is left?"
-        answer = a - b
+# ---------------- REASONING ----------------
+def generate_reasoning(difficulty):
+    type_choice = random.choice(["story", "pattern"])
 
-    elif difficulty == 2:
-        a = random.randint(100, 300)
-        b = random.randint(20, 80)
-        c = random.randint(10, 50)
-        question = f"You had ₹{a}. You spent ₹{b} and ₹{c}. How much is left?"
-        answer = a - b - c
+    # ---------- STORY ----------
+    if type_choice == "story":
+        people = ["Ravi", "Amit", "Suresh", "Karan"]
+        random.shuffle(people)
 
+        if difficulty == 1:
+            q = f"{people[0]} has more money than {people[1]}. Who has more money?"
+            ans = people[0]
+
+        elif difficulty == 2:
+            q = f"{people[0]} is older than {people[1]}, and {people[1]} is older than {people[2]}. Who is youngest?"
+            ans = people[2]
+
+        else:
+            q = (
+                f"{people[0]} is taller than {people[1]}, "
+                f"{people[1]} is taller than {people[2]}, "
+                f"{people[2]} is taller than {people[3]}. "
+                f"Who is second shortest?"
+            )
+            ans = people[2]
+
+    # ---------- PATTERN ----------
     else:
-        a = random.randint(200, 500)
-        b = random.randint(20, 100)
-        c = random.randint(20, 100)
-        d = random.randint(10, 50)
-        question = f"You had ₹{a}. You spent ₹{b}, ₹{c}, and ₹{d}. How much is left?"
-        answer = a - b - c - d
+        if difficulty == 1:
+            # simple arithmetic
+            start = random.randint(1, 10)
+            diff = random.randint(2, 5)
+            seq = [start + i * diff for i in range(4)]
+            ans = seq[-1] + diff
 
-    return question, answer
+        elif difficulty == 2:
+            # geometric
+            start = random.randint(1, 5)
+            ratio = random.randint(2, 3)
+            seq = [start * (ratio ** i) for i in range(4)]
+            ans = seq[-1] * ratio
 
+        else:
+            # mixed hard 
+            start = random.randint(1, 10)
+            seq = [start]
+            for i in range(1, 4):
+                seq.append(seq[-1] + i * 2)
+            ans = seq[-1] + 4 * 2
 
-def generate_time(difficulty):
-    start = random.randint(6, 10)
-
-    if difficulty == 1:
-        add = random.randint(1, 2)
-        question = f"You woke up at {start} AM. After {add} hours, what time is it?"
-        answer = f"{start + add}:00"
-
-    elif difficulty == 2:
-        add1 = random.randint(1, 3)
-        add2 = random.choice([15, 30, 45])
-        question = f"You woke at {start} AM. After {add1} hours and {add2} minutes, what time is it?"
-        answer = f"{start + add1}:{add2:02d}"
-
-    else:
-        add1 = random.randint(1, 3)
-        add2 = random.choice([15, 30, 45])
-        add3 = random.choice([10, 20])
-        question = f"You woke at {start} AM. After {add1} hours, {add2} minutes, and {add3} minutes more, what time is it?"
-
-        total_minutes = add2 + add3
-        extra_hour = total_minutes // 60
-        minutes = total_minutes % 60
-
-        answer = f"{start + add1 + extra_hour}:{minutes:02d}"
-
-    return question, answer
-
-
-def generate_logic(difficulty):
-    if difficulty == 1:
-        question = "Apple, Banana, Car, Mango. Which is different?"
-        answer = "Car"
-
-    elif difficulty == 2:
-        question = "Rahul is older than Amit. Amit is older than John. Who is youngest?"
-        answer = "John"
-
-    else:
-        question = "A is older than B. B is older than C. C is older than D. Who is second oldest?"
-        answer = "B"
-
-    return question, answer
-
-
-def generate_question(difficulty=1):
-    q_type = random.choice(["math", "time", "logic"])
-
-    if q_type == "math":
-        question, answer = generate_math(difficulty)
-    elif q_type == "time":
-        question, answer = generate_time(difficulty)
-    else:
-        question, answer = generate_logic(difficulty)
+        q = f"Find next number: {', '.join(map(str, seq))}"
 
     return {
-        "type": q_type,
-        "difficulty": difficulty,
-        "question": question,
-        "answer": answer
+        "question": q,
+        "answer": str(ans).lower(),
+        "type": "reasoning",
+        "difficulty": difficulty
     }
+
+# ---------------- MATH ----------------
+def generate_math(difficulty):
+    if difficulty == 1:
+        a, b = random.randint(1, 50), random.randint(1, 50)
+        q = f"{a} + {b} = ?"
+        ans = a + b
+
+    elif difficulty == 2:
+        a, b = random.randint(10, 100), random.randint(5, 50)
+        q = f"{a} - {b} = ?"
+        ans = a - b
+
+    else:
+        a, b = random.randint(2, 20), random.randint(2, 20)
+        q = f"{a} × {b} = ?"
+        ans = a * b
+
+    return {
+        "question": q,
+        "answer": str(ans),
+        "type": "math",
+        "difficulty": difficulty
+    }
+
+
+# ---------------- CLOCK ----------------
+def generate_clock(difficulty):
+    hour = random.randint(1, 12)
+    minute = random.choice([0, 15, 30, 45])
+
+    if difficulty == 1:
+        add = random.choice([15, 30])
+    elif difficulty == 2:
+        add = random.choice([30, 45, 60])
+    else:
+        add = random.choice([60, 90, 120])
+
+    total = hour * 60 + minute + add
+
+    new_hour = (total // 60) % 12
+    if new_hour == 0:
+        new_hour = 12
+
+    new_min = total % 60
+
+    q = f"What time is {add} minutes after {hour}:{str(minute).zfill(2)}?"
+    ans = f"{new_hour}:{str(new_min).zfill(2)}"
+
+    return {
+        "question": q,
+        "answer": ans,
+        "type": "clock",
+        "difficulty": difficulty
+    }
+
+
+# ---------------- MAIN GENERATOR ----------------
+def generate_question_set():
+    questions = []
+
+    # 2 reasoning
+    questions.append(generate_reasoning(1))
+    questions.append(generate_reasoning(2))
+
+    # 2 math
+    questions.append(generate_math(1))
+    questions.append(generate_math(2))
+
+    # 2 clock
+    questions.append(generate_clock(1))
+    questions.append(generate_clock(2))
+
+    random.shuffle(questions)
+
+    return questions

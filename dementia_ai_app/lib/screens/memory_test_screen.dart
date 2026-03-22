@@ -35,7 +35,7 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
   bool logicLoading = false;
 
   // ---------------- GLOBAL ----------------
-  int stage = 0; // 0=memory/speech, 1=logic, 2=final
+  int stage = 0; // 0=memory, 1=logic, 2=preview, 3=result
   double logicScore = 0;
   bool isLoading = false;
   Map<String, dynamic>? finalResult;
@@ -55,7 +55,6 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
   // ---------------- MEMORY ----------------
   Future<void> fetchWords() async {
     final res = await http.get(Uri.parse("${Api.baseUrl}/memory/words"));
-
     final data = jsonDecode(res.body);
 
     setState(() {
@@ -73,7 +72,6 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
   // ---------------- SPEECH ----------------
   Future<void> startRecording() async {
     var status = await Permission.microphone.request();
-
     if (!status.isGranted) return;
 
     final dir = await getTemporaryDirectory();
@@ -91,10 +89,8 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
   // ---------------- LOGIC ----------------
   Future<void> startLogicSession() async {
     final res = await http.post(Uri.parse("${Api.baseUrl}/logic/start"));
-
     final data = jsonDecode(res.body);
     logicSessionId = data["session_id"];
-
     fetchLogicQuestion();
   }
 
@@ -120,18 +116,14 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
     logicController.clear();
     logicCount++;
 
-    if (logicCount >= 5) {
+    if (logicCount >= 6) {
       final res = await http.get(Uri.parse(
           "${Api.baseUrl}/logic/session/result?session_id=$logicSessionId"));
 
       final data = jsonDecode(res.body);
       logicScore = (data["logic_score"] ?? 0).toDouble();
 
-      setState(() => stage = 2);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Logic Score: $logicScore")),
-      );
+      setState(() => stage = 2); // preview stage
     } else {
       fetchLogicQuestion();
     }
@@ -156,7 +148,10 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
     setState(() => isLoading = false);
 
     if (response != null) {
-      setState(() => finalResult = response);
+      setState(() {
+        finalResult = response;
+        stage = 3; 
+      });
     }
   }
 
@@ -176,6 +171,12 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
         child: SingleChildScrollView(
           child: Column(
             children: [
+
+              /// PROGRESS BAR
+              LinearProgressIndicator(value: stage / 3),
+
+              const SizedBox(height: 20),
+
               /// ---------------- MEMORY ----------------
               if (stage == 0) ...[
                 const Text("Memorize words", style: TextStyle(fontSize: 20)),
@@ -185,19 +186,22 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
                         style: const TextStyle(fontSize: 22))
                     : const Text("Enter recalled words"),
                 const SizedBox(height: 20),
-                TextField(
-                  controller: recalledController,
-                  decoration:
-                      const InputDecoration(border: OutlineInputBorder()),
-                ),
+                TextField(controller: recalledController),
                 const SizedBox(height: 20),
+
                 ElevatedButton(
                   onPressed: isRecording ? stopRecording : startRecording,
-                  child:
-                      Text(isRecording ? "Stop Recording" : "Start Recording"),
+                  child: Text(
+                      isRecording ? "Stop Recording" : "Start Recording"),
                 ),
+
                 ElevatedButton(
                   onPressed: () {
+                    if (audioPath == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Record speech first")));
+                      return;
+                    }
                     setState(() => stage = 1);
                     startLogicSession();
                   },
@@ -220,117 +224,125 @@ class _MemoryTestScreenState extends State<MemoryTestScreen> {
                             onPressed: submitLogicAnswer,
                             child: const Text("Submit Answer"),
                           ),
+                          Text("Question ${logicCount + 1}/6"),
                         ],
                       )
               ],
 
-              /// ---------------- FINAL ----------------
-              if (stage == 2) ...[
-                ElevatedButton(
-                  onPressed: submitTest,
-                  child: const Text("Submit Final Assessment"),
-                ),
-              ],
-
-              const SizedBox(height: 20),
-
-              if (isLoading) const CircularProgressIndicator(),
-
-              if (finalResult != null)
+              /// ---------------- PREVIEW ----------------
+              if (stage == 2)
                 Container(
                   padding: const EdgeInsets.all(20),
-                  margin: const EdgeInsets.only(top: 20),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 10,
-                        offset: Offset(0, 4),
-                      )
+                      BoxShadow(color: Colors.black12, blurRadius: 10)
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      const Text("Ready for Final Analysis",
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
+
+                      const SizedBox(height: 15),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: const [
+                          Text("Memory Test"),
+                          Icon(Icons.check, color: Colors.green),
+                        ],
+                      ),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: const [
+                          Text("Speech Test"),
+                          Icon(Icons.check, color: Colors.green),
+                        ],
+                      ),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: const [
+                          Text("Logic Test"),
+                          Icon(Icons.check, color: Colors.green),
+                        ],
+                      ),
+
+                      const SizedBox(height: 15),
+
+                      Text("Logic Score: $logicScore"),
+
+                      const SizedBox(height: 20),
+
+                      ElevatedButton(
+                        onPressed: submitTest,
+                        child: const Text("Generate Final Report"),
+                      ),
+                    ],
+                  ),
+                ),
+
+              /// ---------------- RESULT ----------------
+              if (stage == 3 && finalResult != null)
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black12, blurRadius: 10)
                     ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        "🧠 Cognitive Health Report",
-                        style: TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
+                      const Text("Cognitive Health Report",
+                          style: TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.bold)),
 
                       const SizedBox(height: 20),
 
-                      /// SCORE + RISK
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Score: ${finalResult!["cognitive_score"]}",
-                            style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            finalResult!["risk"],
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: getRiskColor(finalResult!["risk"]),
-                            ),
-                          ),
-                        ],
-                      ),
+                      Text("Score: ${finalResult!["cognitive_score"]}"),
+                      Text("Risk: ${finalResult!["risk"]}"),
 
                       const SizedBox(height: 10),
 
                       LinearProgressIndicator(
                         value: finalResult!["cognitive_score"] / 100,
-                        minHeight: 8,
-                        backgroundColor: Colors.grey[300],
                         color: getRiskColor(finalResult!["risk"]),
                       ),
 
                       const SizedBox(height: 20),
 
-                      /// EXTRA SCORES 
-                      Text("Logic Score: $logicScore"),
-                      Text(" Memory Score: ${finalResult!["memory_score"]}"),
+                      Text("Logic: $logicScore"),
+                      Text("Memory: ${finalResult!["memory_score"]}"),
                       Text(
-                          " Speech Score: ${finalResult!["speech_features"]["speech_score"]}"),
-                      Text(" Decline Rate: ${finalResult!["decline_rate"]}"),
+                          "Speech: ${finalResult!["speech_features"]["speech_score"]}"),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 15),
 
-                      /// SUMMARY
-                      const Text(" Summary",
-                          style: TextStyle(fontWeight: FontWeight.bold)),
                       Text(finalResult!["summary"]),
 
-                      const SizedBox(height: 15),
+                      const SizedBox(height: 10),
 
-                      /// INSIGHTS
-                      const Text(" AI Insights",
-                          style: TextStyle(fontWeight: FontWeight.bold)),
                       ...List.generate(
                         finalResult!["insights"].length,
-                        (i) => Text("• ${finalResult!["insights"][i]}"),
+                        (i) =>
+                            Text("• ${finalResult!["insights"][i]}"),
                       ),
 
-                      const SizedBox(height: 15),
+                      const SizedBox(height: 10),
 
-                      /// RECOMMENDATION
-                      const Text(" Recommendation",
-                          style: TextStyle(fontWeight: FontWeight.bold)),
                       Text(finalResult!["recommendation"]),
-
-                      const SizedBox(height: 15),
-
-                      /// CONFIDENCE
-                      Text("Confidence: ${finalResult!["confidence"]}%"),
                     ],
                   ),
-                )
+                ),
+
+              if (isLoading) const CircularProgressIndicator(),
             ],
           ),
         ),
