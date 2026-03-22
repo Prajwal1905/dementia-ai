@@ -23,4 +23,6 @@ class Assessment(Base):
 
     risk_level = Column(String)
     cognitive_score = Column(Integer)
+    trend = Column(String, nullable=True)
+    change = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

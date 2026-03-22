@@ -19,7 +19,7 @@ def get_history(user_id: int = Depends(get_current_user)):
 
     return [
         {
-            "date": r.created_at,
+            "date": r.created_at.isoformat(),
             "memory_score": r.memory_score,
             "cognitive_score": r.cognitive_score,
             "time_taken": r.time_taken,
@@ -30,7 +30,9 @@ def get_history(user_id: int = Depends(get_current_user)):
             "repetition_ratio": r.repetition_ratio,
             "prediction": r.ml_prediction,
             "confidence": r.confidence,
-            "risk_level": r.risk_level
+            "risk_level": r.risk_level,
+            "trend": r.trend,
+            "change": r.change,
         }
         for r in records
     ]

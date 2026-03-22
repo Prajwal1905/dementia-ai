@@ -85,6 +85,26 @@ async def full_assessment(
     final_score = result["final_score"]
     final_risk = result["risk"]
 
+    # ---------- TREND ANALYSIS
+    previous_scores = [r.cognitive_score for r in records]
+
+    if len(previous_scores) >= 3:
+        recent_scores = previous_scores[-3:]
+        avg_past = sum(recent_scores) / len(recent_scores)
+        change = final_score - avg_past
+    else:
+        avg_past = final_score
+        change = 0
+
+    if change < -10:
+        trend = " Significant decline detected"
+    elif change < -5:
+        trend = " Slight decline observed"
+    elif change > 5:
+        trend = " Improvement observed"
+    else:
+        trend = " Stable performance"
+
     # ---------- ML ----------
     ml_prediction, confidence = predict_risk({
         "memory_score": memory_score,
@@ -120,7 +140,9 @@ async def full_assessment(
         decline_rate=decline_rate,
         ml_prediction=ml_prediction,
         confidence=confidence,
-        risk_level=final_risk
+        risk_level=final_risk,
+        trend=trend,
+        change=change,
     )
 
     db.add(record)
@@ -140,5 +162,7 @@ async def full_assessment(
         "confidence": round(confidence * 100, 2) if confidence else 0,
         "summary": explanation["summary"],
         "insights": explanation["insights"],
+        "trend": trend,
+        "change": round(change, 2),
         "recommendation": explanation["recommendation"]
     }

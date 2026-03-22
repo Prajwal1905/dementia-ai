@@ -16,6 +16,7 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   List data = [];
   bool loading = true;
+  String filter = "all";
 
   @override
   void initState() {
@@ -34,8 +35,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (res.statusCode == 200) {
       List temp = jsonDecode(res.body);
 
+      // Sort latest first
       temp.sort((a, b) =>
-          DateTime.parse(a["date"]).compareTo(DateTime.parse(b["date"])));
+          DateTime.parse(b["date"]).compareTo(DateTime.parse(a["date"])));
 
       setState(() {
         data = temp;
@@ -44,11 +46,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  List<FlSpot> getSpots() {
-    return List.generate(data.length, (i) {
+  // ✅ FILTER LOGIC
+  List getFilteredData() {
+    if (filter == "all") return data;
+
+    DateTime now = DateTime.now();
+
+    return data.where((item) {
+      DateTime date = DateTime.parse(item["date"]).toLocal();
+
+      if (filter == "week") {
+        return now.isBefore(date.add(const Duration(days: 7)));
+      } else if (filter == "month") {
+        return now.isBefore(date.add(const Duration(days: 30)));
+      }
+
+      return true;
+    }).toList();
+  }
+
+  // ✅ GRAPH POINTS
+  List<FlSpot> getSpots(List filtered) {
+    return List.generate(filtered.length, (i) {
       return FlSpot(
         i.toDouble(),
-        (data[i]["cognitive_score"] ?? 0).toDouble(),
+        (filtered[i]["cognitive_score"] ?? 0).toDouble(),
       );
     });
   }
@@ -65,8 +87,28 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return "↑ Stable";
   }
 
+  Widget filterButton(String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor:
+              filter == value.toLowerCase() ? Colors.blue : Colors.grey,
+        ),
+        onPressed: () {
+          setState(() {
+            filter = value.toLowerCase();
+          });
+        },
+        child: Text(value),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final filtered = getFilteredData();
+
     return Scaffold(
       appBar: AppBar(title: const Text("Cognitive History")),
       body: loading
@@ -77,49 +119,45 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-
                       const Text(
                         "Cognitive Score Trend",
                         style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
 
                       const SizedBox(height: 10),
 
-                      
-                      Text(
-                        "Latest Score: ${data.last["cognitive_score"]}",
-                        style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          filterButton("All"),
+                          filterButton("Week"),
+                          filterButton("Month"),
+                        ],
                       ),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 10),
 
-                      
                       SizedBox(
                         height: 250,
                         child: LineChart(
                           LineChartData(
                             minY: 0,
                             maxY: 100,
-
                             gridData: FlGridData(show: true),
-
                             borderData: FlBorderData(
                               show: true,
                               border: Border.all(color: Colors.grey),
                             ),
-
-                            
                             titlesData: FlTitlesData(
                               leftTitles: AxisTitles(
                                 sideTitles: SideTitles(
                                   showTitles: true,
                                   interval: 20,
-                                  reservedSize: 30,
                                 ),
                               ),
-
                               bottomTitles: AxisTitles(
                                 sideTitles: SideTitles(
                                   showTitles: true,
@@ -128,17 +166,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     if (value % 1 != 0) return const SizedBox();
 
                                     int index = value.toInt();
-                                    if (index >= data.length) {
+                                    if (index >= filtered.length) {
                                       return const SizedBox();
                                     }
 
-                                    return Text("T${index + 1}");
+                                    final date =
+                                        DateTime.parse(filtered[index]["date"])
+                                            .toLocal();
+
+                                    return Text(
+                                      "${date.day}/${date.month}",
+                                      style: const TextStyle(fontSize: 10),
+                                    );
                                   },
                                 ),
                               ),
                             ),
-
-                            
                             lineTouchData: LineTouchData(
                               touchTooltipData: LineTouchTooltipData(
                                 getTooltipItems: (spots) {
@@ -151,17 +194,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 },
                               ),
                             ),
-
                             lineBarsData: [
                               LineChartBarData(
-                                spots: getSpots(),
+                                spots: getSpots(filtered),
                                 isCurved: true,
                                 curveSmoothness: 0.3,
                                 barWidth: 3,
                                 color: Colors.blue,
-
                                 dotData: FlDotData(show: true),
-
                                 belowBarData: BarAreaData(
                                   show: true,
                                   color: Colors.blue.withOpacity(0.15),
@@ -172,14 +212,110 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 15),
 
-                      
+                      // 🔥 Latest Analysis (Clean UI)
+                      if (filtered.isNotEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          margin: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 6,
+                                offset: Offset(0, 3),
+                              )
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "🧠 Latest Analysis",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // Score + Risk in one row
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    "Score: ${filtered.first["cognitive_score"]}",
+                                    style: const TextStyle(fontSize: 15),
+                                  ),
+                                  Text(
+                                    filtered.first["risk_level"],
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: getRiskColor(
+                                          filtered.first["risk_level"]),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 10),
+
+                              // Decline
+                              Text(
+                                "Decline: ${filtered.first["decline_rate"]}",
+                                style: const TextStyle(fontSize: 14),
+                              ),
+
+                              const SizedBox(height: 5),
+
+                              Text(
+                                getTrend(
+                                  (filtered.first["decline_rate"] ?? 0)
+                                      .toDouble(),
+                                ),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color:
+                                      (filtered.first["decline_rate"] ?? 0) > 10
+                                          ? Colors.red
+                                          : Colors.green,
+                                ),
+                              ),
+
+                              const SizedBox(height: 10),
+
+                              // 🔥 NEW TREND
+                              if (filtered.first["trend"] != null)
+                                Text(
+                                  filtered.first["trend"],
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.deepPurple,
+                                  ),
+                                ),
+
+                              if (filtered.first["change"] != null)
+                                Text(
+                                  "Change: ${filtered.first["change"]}",
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                            ],
+                          ),
+                        ),
+
+                      const SizedBox(height: 15),
+
                       Expanded(
                         child: ListView.builder(
-                          itemCount: data.length,
+                          itemCount: filtered.length,
                           itemBuilder: (_, i) {
-                            final item = data[i];
+                            final item = filtered[i];
 
                             final score =
                                 (item["cognitive_score"] ?? 0).toDouble();
@@ -194,9 +330,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               margin: const EdgeInsets.symmetric(vertical: 8),
                               child: ListTile(
                                 title: Text(
-                                  " Score: ${score.toStringAsFixed(1)}",
+                                  "Score: ${score.toStringAsFixed(1)}",
                                   style: const TextStyle(
-                                      fontWeight: FontWeight.bold),
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -226,7 +363,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             );
                           },
                         ),
-                      )
+                      ),
                     ],
                   ),
                 ),
